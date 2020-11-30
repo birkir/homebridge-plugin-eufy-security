@@ -1,15 +1,19 @@
 {
-  "pluginAlias": "ExampleHomebridgePlugin",
+  "pluginAlias": "EufySecurityHomebridgePlugin",
   "pluginType": "platform",
   "singular": true,
   "schema": {
     "type": "object",
     "properties": {
-      "name": {
+      "username": {
         "title": "Name",
         "type": "string",
-        "required": true,
-        "default": "Example Dynamic Platform"
+        "required": true
+      },
+      "password": {
+          "title": "Password",
+          "type": "string",
+          "required": true
       }
     }
   }

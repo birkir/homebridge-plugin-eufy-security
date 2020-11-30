@@ -1,35 +1,134 @@
 import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
-
+import { HttpService, PushRegisterService, PushClient } from 'eufy-node-client';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { ExamplePlatformAccessory } from './platformAccessory';
+import { DoorbellPlatformAccessory } from './doorbell-platform-accessory';
+import { DeviceType } from './eufy-types';
+import fs from 'fs';
+
+// interface EufySecurityPlatformConfig extends PlatformConfig {
+//   username: string;
+//   password: string;
+//   // Ignore hubs by "station_sn"
+//   ignoreHubSns?: string[];
+//   // Ignore devices by "device_sn"
+//   ignoreDeviceIds?: string[];
+// }
+
+interface PushMessageMsg {
+  id: '1A89D6FA';
+  from: '348804314802';
+  to: 'cvWe0R4uvkT-jHUAFU2T-o';
+  category: 'com.oceanwing.battery.cam';
+  persistentId: '0:1606675850222452%0d2a775cf9fd7ecd';
+  ttl: 3600;
+  sent: '1606675850218';
+  payload: {
+    content: 'Doorbell:Someone has press doorbell';
+    device_sn: 'T8210P0020304E84';
+    event_time: '1606675847683';
+    payload: {
+      event_type: 3103;
+      device_sn: 'T8210P0020304E84';
+      name: 'Doorbell';
+      channel: 0;
+      cipher: 223;
+      session_id: '20201129_185047';
+      pic_url: 'https://security-app-eu.eufylife.com/v1/s/g/qvJv7t0Mg';
+      create_time: 1606675847683;
+      file_path: '';
+      notification_style: 2;
+      push_count: 2;
+    };
+    push_time: '1606675850209';
+    station_sn: 'T8010P2320321826';
+    title: '';
+    type: '7';
+    'google.c.sender.id': '348804314802';
+  };
+}
 
 /**
  * HomebridgePlatform
  * This class is the main constructor for your plugin, this is where you should
  * parse the user config and discover/register accessories with Homebridge.
  */
-export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
+export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
 
+  public httpService: HttpService;
+
   constructor(
     public readonly log: Logger,
     public readonly config: PlatformConfig,
     public readonly api: API,
   ) {
+    this.log.debug('Config', this.config);
     this.log.debug('Finished initializing platform:', this.config.name);
+
+    this.httpService = new HttpService((config as any).username, (config as any).password);
 
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
     // in order to ensure they weren't added to homebridge already. This event can also be used
     // to start discovery of new accessories.
-    this.api.on('didFinishLaunching', () => {
+    this.api.on('didFinishLaunching', async () => {
+
+      await this.setupPushClient();
+
       log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
       this.discoverDevices();
+    });
+  }
+
+
+  async setupPushClient() {
+    const storagePath = this.api.user.storagePath();
+    const credentialsPath = `${storagePath}/eufy-security-credentials.json`;
+
+    let credentials: any = null;
+    if (fs.existsSync(credentialsPath)) {
+      this.log.info('credentials found. reusing them...');
+      credentials = JSON.parse(fs.readFileSync(credentialsPath).toString());
+    } else {
+      // Register push credentials
+      this.log.info('no credentials found. register new...');
+      const pushService = new PushRegisterService();
+      credentials = await pushService.createPushCredentials();
+      fs.writeFileSync(credentialsPath, JSON.stringify(credentials));
+      this.log.info('wait a short time (5sec)...');
+      await new Promise(r => setTimeout(r, 5000));
+    }
+
+    // Start push client
+    const pushClient = await PushClient.init({
+      androidId: credentials.checkinResponse.androidId,
+      securityToken: credentials.checkinResponse.securityToken,
+    });
+
+    const fcmToken = credentials.gcmResponse.token;
+    await this.httpService.registerPushToken(fcmToken);
+    this.log.debug('Registered at eufy with:', fcmToken);
+  
+    setInterval(async () => {
+      await this.httpService.pushTokenCheck();
+    }, 30 * 1000);
+
+    pushClient.connect((msg) => {
+      this.log.debug('Got push message:', msg);
+      const matchingUuid = this.api.hap.uuid.generate(msg.payload.device_sn);
+      const knownAccessory = this.accessories.find(accessory => accessory.UUID === matchingUuid);
+    
+      if (knownAccessory) {
+        knownAccessory.getService(this.api.hap.Service.Doorbell)!
+          .updateCharacteristic(this.api.hap.Characteristic.ProgrammableSwitchEvent, this.api.hap.Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
+      }
+
+      this.log.info('Got push message:', msg);
     });
   }
 
@@ -49,73 +148,57 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
    * Accessories must only be registered once, previously created accessories
    * must not be registered again to prevent "duplicate UUID" errors.
    */
-  discoverDevices() {
+  async discoverDevices() {
 
-    // EXAMPLE ONLY
-    // A real plugin you would discover accessories from the local network, cloud services
-    // or a user-defined array in the platform config.
-    const exampleDevices = [
-      {
-        exampleUniqueId: 'ABCD',
-        exampleDisplayName: 'Bedroom',
-      },
-      {
-        exampleUniqueId: 'EFGH',
-        exampleDisplayName: 'Kitchen',
-      },
-    ];
+    const hubs = await this.httpService.listHubs();
 
-    // loop over the discovered devices and register each one if it has not already been registered
-    for (const device of exampleDevices) {
+    for (const hub of hubs) {
+      if ((this.config as any).ignoreHubSns?.includes(hub.station_sn)) {
+        continue;
+      }
+      
+      const { station_sn } = hub;
 
-      // generate a unique id for the accessory this should be generated from
-      // something globally unique, but constant, for example, the device serial
-      // number or MAC address
-      const uuid = this.api.hap.uuid.generate(device.exampleUniqueId);
+      const devices = await this.httpService.listDevices({ station_sn });
 
-      // see if an accessory with the same uuid has already been registered and restored from
-      // the cached devices we stored in the `configureAccessory` method above
-      const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-
-      if (existingAccessory) {
-        // the accessory already exists
-        if (device) {
-          this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
-
-          // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. eg.:
-          // existingAccessory.context.device = device;
-          // this.api.updatePlatformAccessories([existingAccessory]);
-
-          // create the accessory handler for the restored accessory
-          // this is imported from `platformAccessory.ts`
-          new ExamplePlatformAccessory(this, existingAccessory);
-          
-          // update accessory cache with any changes to the accessory details and information
-          this.api.updatePlatformAccessories([existingAccessory]);
-        } else if (!device) {
-          // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
-          // remove platform accessories when no longer present
-          this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-          this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
+      for (const device of devices) {
+        if ((this.config as any).ignoreDeviceIds?.includes(device.device_sn)) {
+          continue;
         }
-      } else {
-        // the accessory does not yet exist, so we need to create it
-        this.log.info('Adding new accessory:', device.exampleDisplayName);
 
-        // create a new accessory
-        const accessory = new this.api.platformAccessory(device.exampleDisplayName, uuid);
+        const uuid = this.api.hap.uuid.generate(device.device_sn);
+        const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
 
-        // store a copy of the device object in the `accessory.context`
-        // the `context` property can be used to store any data about the accessory you may need
-        accessory.context.device = device;
+        // doorbell
+        if (device.device_type === DeviceType.BATTERY_DOORBELL) {
+          if (existingAccessory) {
+            // the accessory already exists
+            this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
+            new DoorbellPlatformAccessory(this, existingAccessory, device);
+          } else {
+            // the accessory does not yet exist, so we need to create it
+            this.log.info('Adding new accessory:', device.device_name);
 
-        // create the accessory handler for the newly create accessory
-        // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, accessory);
+            // create a new accessory
+            const accessory = new this.api.platformAccessory(device.device_name, uuid);
 
-        // link the accessory to your platform
-        this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+            // store a copy of the device object in the `accessory.context`
+            // the `context` property can be used to store any data about the accessory you may need
+            accessory.context.device = device;
+
+            // create the accessory handler for the newly create accessory
+            // this is imported from `platformAccessory.ts`
+            new DoorbellPlatformAccessory(this, accessory, device);
+
+            // link the accessory to your platform
+            this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+          }
+        }
       }
     }
+
+    // @todo
+    // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
+    // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
   }
 }
