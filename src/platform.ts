@@ -143,7 +143,13 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
         );
 
         // doorbell
-        if (device.device_type === DeviceType.BATTERY_DOORBELL) {
+        if (
+          [
+            DeviceType.BATTERY_DOORBELL,
+            DeviceType.BATTERY_DOORBELL_2,
+            DeviceType.DOORBELL,
+          ].includes(device.device_type)
+        ) {
           if (existingAccessory) {
             // the accessory already exists
             this.log.info(
