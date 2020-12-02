@@ -2,7 +2,7 @@
   "private": false,
   "displayName": "EufySecurityHomebridgePlugin",
   "name": "homebridge-plugin-eufy-security",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "description": "Eufy Security homebridge plugin for video doorbell.",
   "license": "MIT",
   "repository": {

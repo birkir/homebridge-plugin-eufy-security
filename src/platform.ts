@@ -1,51 +1,17 @@
-import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
-import { HttpService, PushRegisterService, PushClient } from 'eufy-node-client';
-import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { DoorbellPlatformAccessory } from './doorbell-platform-accessory';
-import { DeviceType } from './eufy-types';
-import fs from 'fs';
-
-// interface EufySecurityPlatformConfig extends PlatformConfig {
-//   username: string;
-//   password: string;
-//   // Ignore hubs by "station_sn"
-//   ignoreHubSns?: string[];
-//   // Ignore devices by "device_sn"
-//   ignoreDeviceIds?: string[];
-// }
-
-interface PushMessageMsg {
-  id: '1A89D6FA';
-  from: '348804314802';
-  to: 'cvWe0R4uvkT-jHUAFU2T-o';
-  category: 'com.oceanwing.battery.cam';
-  persistentId: '0:1606675850222452%0d2a775cf9fd7ecd';
-  ttl: 3600;
-  sent: '1606675850218';
-  payload: {
-    content: 'Doorbell:Someone has press doorbell';
-    device_sn: 'T8210P0020304E84';
-    event_time: '1606675847683';
-    payload: {
-      event_type: 3103;
-      device_sn: 'T8210P0020304E84';
-      name: 'Doorbell';
-      channel: 0;
-      cipher: 223;
-      session_id: '20201129_185047';
-      pic_url: 'https://security-app-eu.eufylife.com/v1/s/g/qvJv7t0Mg';
-      create_time: 1606675847683;
-      file_path: '';
-      notification_style: 2;
-      push_count: 2;
-    };
-    push_time: '1606675850209';
-    station_sn: 'T8010P2320321826';
-    title: '';
-    type: '7';
-    'google.c.sender.id': '348804314802';
-  };
-}
+import {
+  API,
+  DynamicPlatformPlugin,
+  Logger,
+  PlatformAccessory,
+  PlatformConfig,
+  Service,
+  Characteristic,
+} from "homebridge";
+import { HttpService, PushRegisterService, PushClient } from "eufy-node-client";
+import { PLATFORM_NAME, PLUGIN_NAME } from "./settings";
+import { DoorbellPlatformAccessory } from "./doorbell-platform-accessory";
+import { DeviceType } from "./eufy-types";
+import fs from "fs";
 
 /**
  * HomebridgePlatform
@@ -54,7 +20,8 @@ interface PushMessageMsg {
  */
 export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
-  public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
+  public readonly Characteristic: typeof Characteristic = this.api.hap
+    .Characteristic;
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
@@ -64,27 +31,28 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
   constructor(
     public readonly log: Logger,
     public readonly config: PlatformConfig,
-    public readonly api: API,
+    public readonly api: API
   ) {
-    this.log.debug('Config', this.config);
-    this.log.debug('Finished initializing platform:', this.config.name);
+    this.log.debug("Config", this.config);
+    this.log.debug("Finished initializing platform:", this.config.name);
 
-    this.httpService = new HttpService((config as any).username, (config as any).password);
+    this.httpService = new HttpService(
+      (config as any).username,
+      (config as any).password
+    );
 
     // When this event is fired it means Homebridge has restored all cached accessories from disk.
     // Dynamic Platform plugins should only register new accessories after this event was fired,
     // in order to ensure they weren't added to homebridge already. This event can also be used
     // to start discovery of new accessories.
-    this.api.on('didFinishLaunching', async () => {
-
+    this.api.on("didFinishLaunching", async () => {
       await this.setupPushClient();
 
-      log.debug('Executed didFinishLaunching callback');
+      log.debug("Executed didFinishLaunching callback");
       // run the method to discover / register your devices as accessories
       this.discoverDevices();
     });
   }
-
 
   async setupPushClient() {
     const storagePath = this.api.user.storagePath();
@@ -92,16 +60,16 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
 
     let credentials: any = null;
     if (fs.existsSync(credentialsPath)) {
-      this.log.info('credentials found. reusing them...');
+      this.log.info("credentials found. reusing them...");
       credentials = JSON.parse(fs.readFileSync(credentialsPath).toString());
     } else {
       // Register push credentials
-      this.log.info('no credentials found. register new...');
+      this.log.info("no credentials found. register new...");
       const pushService = new PushRegisterService();
       credentials = await pushService.createPushCredentials();
       fs.writeFileSync(credentialsPath, JSON.stringify(credentials));
-      this.log.info('wait a short time (5sec)...');
-      await new Promise(r => setTimeout(r, 5000));
+      this.log.info("wait a short time (5sec)...");
+      await new Promise((r) => setTimeout(r, 5000));
     }
 
     // Start push client
@@ -112,23 +80,27 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
 
     const fcmToken = credentials.gcmResponse.token;
     await this.httpService.registerPushToken(fcmToken);
-    this.log.debug('Registered at eufy with:', fcmToken);
-  
+    this.log.debug("Registered at eufy with:", fcmToken);
+
     setInterval(async () => {
       await this.httpService.pushTokenCheck();
     }, 30 * 1000);
 
     pushClient.connect((msg) => {
-      this.log.debug('Got push message:', msg);
+      this.log.debug("Got push message:", msg);
       const matchingUuid = this.api.hap.uuid.generate(msg.payload.device_sn);
-      const knownAccessory = this.accessories.find(accessory => accessory.UUID === matchingUuid);
-    
-      if (knownAccessory) {
-        knownAccessory.getService(this.api.hap.Service.Doorbell)!
-          .updateCharacteristic(this.api.hap.Characteristic.ProgrammableSwitchEvent, this.api.hap.Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS);
-      }
+      const knownAccessory = this.accessories.find(
+        (accessory) => accessory.UUID === matchingUuid
+      );
 
-      this.log.info('Got push message:', msg);
+      if (knownAccessory) {
+        knownAccessory
+          .getService(this.api.hap.Service.Doorbell)!
+          .updateCharacteristic(
+            this.api.hap.Characteristic.ProgrammableSwitchEvent,
+            this.api.hap.Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS
+          );
+      }
     });
   }
 
@@ -137,7 +109,7 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
    * It should be used to setup event handlers for characteristics and update respective values.
    */
   configureAccessory(accessory: PlatformAccessory) {
-    this.log.info('Loading accessory from cache:', accessory.displayName);
+    this.log.info("Loading accessory from cache:", accessory.displayName);
 
     // add the restored accessory to the accessories cache so we can track if it has already been registered
     this.accessories.push(accessory);
@@ -149,14 +121,13 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
    * must not be registered again to prevent "duplicate UUID" errors.
    */
   async discoverDevices() {
-
     const hubs = await this.httpService.listHubs();
 
     for (const hub of hubs) {
       if ((this.config as any).ignoreHubSns?.includes(hub.station_sn)) {
         continue;
       }
-      
+
       const { station_sn } = hub;
 
       const devices = await this.httpService.listDevices({ station_sn });
@@ -167,20 +138,28 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
         }
 
         const uuid = this.api.hap.uuid.generate(device.device_sn);
-        const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
+        const existingAccessory = this.accessories.find(
+          (accessory) => accessory.UUID === uuid
+        );
 
         // doorbell
         if (device.device_type === DeviceType.BATTERY_DOORBELL) {
           if (existingAccessory) {
             // the accessory already exists
-            this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
+            this.log.info(
+              "Restoring existing accessory from cache:",
+              existingAccessory.displayName
+            );
             new DoorbellPlatformAccessory(this, existingAccessory, device);
           } else {
             // the accessory does not yet exist, so we need to create it
-            this.log.info('Adding new accessory:', device.device_name);
+            this.log.info("Adding new accessory:", device.device_name);
 
             // create a new accessory
-            const accessory = new this.api.platformAccessory(device.device_name, uuid);
+            const accessory = new this.api.platformAccessory(
+              device.device_name,
+              uuid
+            );
 
             // store a copy of the device object in the `accessory.context`
             // the `context` property can be used to store any data about the accessory you may need
@@ -191,7 +170,9 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
             new DoorbellPlatformAccessory(this, accessory, device);
 
             // link the accessory to your platform
-            this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+            this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
+              accessory,
+            ]);
           }
         }
       }
