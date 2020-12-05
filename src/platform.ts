@@ -46,7 +46,12 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
     // in order to ensure they weren't added to homebridge already. This event can also be used
     // to start discovery of new accessories.
     this.api.on("didFinishLaunching", async () => {
-      await this.setupPushClient();
+      if (this.config.enablePush) {
+        this.log.info("push client enabled");
+        await this.setupPushClient();
+      } else {
+        this.log.info("push client disabled");
+      }
 
       log.debug("Executed didFinishLaunching callback");
       // run the method to discover / register your devices as accessories
@@ -79,27 +84,46 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
     });
 
     const fcmToken = credentials.gcmResponse.token;
-    await this.httpService.registerPushToken(fcmToken);
-    this.log.debug("Registered at eufy with:", fcmToken);
+    await new Promise(resolve => {
+      this.httpService.registerPushToken(fcmToken).catch(err => {
+        this.log.error('failed to register push token', err);
+        resolve();
+      })
+      .then(() => {
+        this.log.debug("registered at eufy with:", fcmToken);
+        resolve();
+      })
+      setTimeout(() => {
+        this.log.error('registering a push token timed out');
+        resolve();
+      }, 20000);
+    })
 
     setInterval(async () => {
-      await this.httpService.pushTokenCheck();
+      try {
+        await this.httpService.pushTokenCheck();
+      } catch (err) {
+        this.log.warn('failed to confirm push token');
+      }
     }, 30 * 1000);
 
     pushClient.connect((msg) => {
-      this.log.debug("Got push message:", msg);
-      const matchingUuid = this.api.hap.uuid.generate(msg.payload.device_sn);
+      const matchingUuid = this.api.hap.uuid.generate(msg.payload?.device_sn);
       const knownAccessory = this.accessories.find(
         (accessory) => accessory.UUID === matchingUuid
       );
 
+      this.log.debug("push message:", msg.payload);
+
       if (knownAccessory) {
-        knownAccessory
-          .getService(this.api.hap.Service.Doorbell)!
-          .updateCharacteristic(
-            this.api.hap.Characteristic.ProgrammableSwitchEvent,
-            this.api.hap.Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS
-          );
+        if (msg.payload?.event_type === 3100) {
+          knownAccessory
+            .getService(this.api.hap.Service.Doorbell)!
+            .updateCharacteristic(
+              this.api.hap.Characteristic.ProgrammableSwitchEvent,
+              this.api.hap.Characteristic.ProgrammableSwitchEvent.SINGLE_PRESS
+            );
+        }
       }
     });
   }
@@ -125,17 +149,29 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
 
     for (const hub of hubs) {
       if ((this.config as any).ignoreHubSns?.includes(hub.station_sn)) {
+        this.log.debug('ignoring station ' + hub.station_sn);
         continue;
       }
-
+      
       const { station_sn } = hub;
+      
+      this.log.debug(`found station "${hub.station_name}" (${hub.station_sn}) `);
 
       const devices = await this.httpService.listDevices({ station_sn });
 
       for (const device of devices) {
         if ((this.config as any).ignoreDeviceIds?.includes(device.device_sn)) {
+          this.log.debug(`ignoring device "${device.device_name}" (${device.device_sn})`)
           continue;
         }
+
+        this.log.debug(`found device "${device.device_name}" (${hub.station_sn})
+  ID: ${device.device_id}
+  Model: ${device.device_model}
+  Serial Number: ${device.device_sn}
+  Type: ${device.device_type}
+  Channel: ${device.device_channel}
+        `);
 
         const uuid = this.api.hap.uuid.generate(device.device_sn);
         const existingAccessory = this.accessories.find(

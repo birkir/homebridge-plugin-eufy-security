@@ -14,6 +14,12 @@
           "title": "Password",
           "type": "string",
           "required": true
+      },
+      "enablePush": {
+        "title":"Push Client",
+        "type": "boolean",
+        "default": true,
+        "required": true
       }
     }
   }
