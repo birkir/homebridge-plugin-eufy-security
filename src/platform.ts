@@ -10,7 +10,7 @@ import {
 import { HttpService, PushRegisterService, PushClient } from "eufy-node-client";
 import { PLATFORM_NAME, PLUGIN_NAME } from "./settings";
 import { DoorbellPlatformAccessory } from "./doorbell-platform-accessory";
-import { DeviceType } from "./eufy-types";
+import { DeviceType, MessageTypes } from "./eufy-types";
 import fs from "fs";
 
 /**
@@ -116,7 +116,9 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
       this.log.debug("push message:", msg.payload);
 
       if (knownAccessory) {
-        if (msg.payload?.event_type === 3100) {
+        if (msg.payload?.event_type === MessageTypes.MOTION_DETECTION || msg.payload?.event_type === MessageTypes.FACE_DETECTION) {
+          // TODO: Implement motion sensor
+        } else if (msg.payload?.event_type === MessageTypes.PRESS_DOORBELL) {
           knownAccessory
             .getService(this.api.hap.Service.Doorbell)!
             .updateCharacteristic(
