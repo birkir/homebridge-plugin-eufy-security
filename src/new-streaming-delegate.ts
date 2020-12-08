@@ -1,5 +1,4 @@
 import {
-  API,
   APIEvent,
   AudioStreamingCodecType,
   AudioStreamingSamplerate,
@@ -19,16 +18,16 @@ import {
   StreamRequestTypes,
   Logger,
   VideoInfo,
-} from "homebridge";
-import { spawn } from "child_process";
-import { createSocket, Socket } from "dgram";
-import ffmpegPath from "ffmpeg-for-homebridge";
-import { FullDevice } from "eufy-node-client/src/http/http-response.models";
-import { EufySecurityHomebridgePlatform } from "./platform";
-import getPort from "get-port";
-import os from "os";
-import { networkInterfaceDefault } from "systeminformation";
-import { FfmpegProcess } from "./ffmpeg";
+} from 'homebridge';
+import { spawn } from 'child_process';
+import { createSocket, Socket } from 'dgram';
+import ffmpegPath from 'ffmpeg-for-homebridge';
+import { FullDevice } from 'eufy-node-client/src/http/http-response.models';
+import { EufySecurityHomebridgePlatform } from './platform';
+import getPort from 'get-port';
+import os from 'os';
+import { networkInterfaceDefault } from 'systeminformation';
+import { FfmpegProcess } from './ffmpeg';
 
 type SessionInfo = {
   address: string; // address of the HAP controller
@@ -82,17 +81,13 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
   timeouts: Record<string, NodeJS.Timeout> = {};
 
   constructor(platform: EufySecurityHomebridgePlatform, device: FullDevice) {
-    // eslint-disable-line @typescript-eslint/explicit-module-boundary-typescript
-    // , log: Logger, cameraConfig: CameraConfig, api: API, videoProcessor: string, interfaceName?: string
     this.log = platform.log;
-    //   this.videoConfig = cameraConfig.videoConfig;
     this.hap = platform.api.hap;
     this.platform = platform;
     this.device = device;
 
-    this.cameraName = "Test";
-    this.videoProcessor = ffmpegPath || "ffmpeg";
-    //   this.interfaceName = 'hmm';
+    this.cameraName = device.device_name;
+    this.videoProcessor = ffmpegPath || 'ffmpeg';
 
     platform.api.on(APIEvent.SHUTDOWN, () => {
       for (const session in this.ongoingSessions) {
@@ -151,10 +146,11 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
 
   private determineResolution(
     request: SnapshotRequest | VideoInfo,
-    isSnapshot: boolean
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    isSnapshot: boolean,
   ): ResolutionInfo {
-    let width = request.width;
-    let height = request.height;
+    const width = request.width;
+    const height = request.height;
     //   if (!isSnapshot) {
     //     if ((this.videoConfig.forceMax && this.videoConfig.maxWidth) ||
     //       (request.width > this.videoConfig.maxWidth)) {
@@ -166,8 +162,8 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
     //     }
     //   }
 
-    const filters: Array<string> = ["scale=1280:720"];
-    const noneFilter = filters.indexOf("none");
+    const filters: Array<string> = ['scale=1280:720'];
+    const noneFilter = filters.indexOf('none');
     if (noneFilter >= 0) {
       filters.splice(noneFilter, 1);
     }
@@ -177,35 +173,35 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
         //     (height > 0 ? '\'min(' + height + ',ih)\'' : 'ih') +
         //     ':force_original_aspect_ratio=decrease');
         //   filters.push('scale=trunc(iw/2)*2:trunc(ih/2)*2'); // Force to fit encoder restrictions
-        filters.push("scale='trunc(iw/2)*2':'trunc(ih/2)*2'"); // Force to fit encoder restrictions
+        filters.push('scale=\'trunc(iw/2)*2\':\'trunc(ih/2)*2\''); // Force to fit encoder restrictions
       }
     }
 
     return {
       width: width,
       height: height,
-      videoFilter: filters.join(","),
+      videoFilter: filters.join(','),
     };
   }
 
   handleSnapshotRequest(
     request: SnapshotRequest,
-    callback: SnapshotRequestCallback
+    callback: SnapshotRequestCallback,
   ): void {
     const resolution = this.determineResolution(request, true);
 
     this.log.debug(
-      "Snapshot requested: " + request.width + " x " + request.height,
+      'Snapshot requested: ' + request.width + ' x ' + request.height,
       this.cameraName,
-      this.debug
+      this.debug,
     );
     this.log.debug(
-      "Sending snapshot: " +
-        (resolution.width > 0 ? resolution.width : "native") +
-        " x " +
-        (resolution.height > 0 ? resolution.height : "native"),
+      'Sending snapshot: ' +
+        (resolution.width > 0 ? resolution.width : 'native') +
+        ' x ' +
+        (resolution.height > 0 ? resolution.height : 'native'),
       this.cameraName,
-      this.debug
+      this.debug,
     );
 
     // get device info
@@ -218,11 +214,11 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
         let ffmpegArgs = `-i ${device.cover_path}`;
 
         ffmpegArgs += // Still
-          " -frames:v 1" +
+          ' -frames:v 1' +
           (resolution.videoFilter
-            ? " -filter:v " + resolution.videoFilter
-            : "") +
-          " -f image2 -";
+            ? ' -filter:v ' + resolution.videoFilter
+            : '') +
+          ' -f image2 -';
 
         try {
           const ffmpeg = spawn(this.videoProcessor, ffmpegArgs.split(/\s+/), {
@@ -231,21 +227,21 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
 
           let imageBuffer = Buffer.alloc(0);
           this.log.debug(
-            "Snapshot command: " + this.videoProcessor + " " + ffmpegArgs,
+            'Snapshot command: ' + this.videoProcessor + ' ' + ffmpegArgs,
             this.cameraName,
-            this.debug
+            this.debug,
           );
-          ffmpeg.stdout.on("data", (data: Uint8Array) => {
+          ffmpeg.stdout.on('data', (data: Uint8Array) => {
             imageBuffer = Buffer.concat([imageBuffer, data]);
           });
           const log = this.log;
-          ffmpeg.on("error", (error: string) => {
+          ffmpeg.on('error', (error: string) => {
             log.error(
-              "An error occurred while making snapshot request: " + error,
-              this.cameraName
+              'An error occurred while making snapshot request: ' + error,
+              this.cameraName,
             );
           });
-          ffmpeg.on("close", () => {
+          ffmpeg.on('close', () => {
             callback(undefined, imageBuffer);
           });
         } catch (err) {
@@ -263,14 +259,14 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
     const externalInfo = interfaces[interfaceName]?.filter((info) => {
       return !info.internal;
     });
-    const preferredFamily = ipv6 ? "IPv6" : "IPv4";
+    const preferredFamily = ipv6 ? 'IPv6' : 'IPv4';
     const addressInfo =
       externalInfo?.find((info) => {
         return info.family === preferredFamily;
       }) || externalInfo?.[0];
     if (!addressInfo) {
       throw new Error(
-        'Unable to get network address for "' + interfaceName + '"!'
+        'Unable to get network address for "' + interfaceName + '"!',
       );
     }
     return addressInfo.address;
@@ -278,21 +274,21 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
 
   async prepareStream(
     request: PrepareStreamRequest,
-    callback: PrepareStreamCallback
+    callback: PrepareStreamCallback,
   ): Promise<void> {
     const videoReturnPort = await getPort();
     const videoSSRC = this.hap.CameraController.generateSynchronisationSource();
     const audioReturnPort = await getPort();
     const audioSSRC = this.hap.CameraController.generateSynchronisationSource();
 
-    const ipv6 = request.addressVersion === "ipv6";
+    const ipv6 = request.addressVersion === 'ipv6';
 
     let currentAddress: string;
     try {
       currentAddress = await this.getIpAddress(ipv6, this.interfaceName);
     } catch (ex) {
       if (this.interfaceName) {
-        this.log.warn(ex + " Falling back to default.", this.cameraName);
+        this.log.warn(ex + ' Falling back to default.', this.cameraName);
         currentAddress = await this.getIpAddress(ipv6);
       } else {
         throw ex;
@@ -347,7 +343,7 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
 
   private startStream(
     request: StartStreamRequest,
-    callback: StreamRequestCallback
+    callback: StreamRequestCallback,
   ): void {
     this.platform.httpService
       .startStream({
@@ -356,14 +352,14 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
         proto: 2,
       })
       .then(async ({ url }) => {
-          await new Promise(r => setTimeout(r, 500));
-          return url;
+        await new Promise((r) => setTimeout(r, 500));
+        return url;
       })
       .then((url) => {
         const sessionInfo = this.pendingSessions[request.sessionID];
-        const vcodec = "libx264";
+        const vcodec = 'libx264';
         const mtu = 1316; // request.video.mtu is not used
-        const encoderOptions = "-preset ultrafast";
+        const encoderOptions = '-preset ultrafast';
 
         const resolution = this.determineResolution(request.video, false);
 
@@ -386,29 +382,29 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
         //   }
 
         this.log.debug(
-          "Video stream requested: " +
+          'Video stream requested: ' +
             request.video.width +
-            " x " +
+            ' x ' +
             request.video.height +
-            ", " +
+            ', ' +
             request.video.fps +
-            " fps, " +
+            ' fps, ' +
             request.video.max_bit_rate +
-            " kbps",
+            ' kbps',
           this.cameraName,
-          this.debug
+          this.debug,
         );
         this.log.info(
-          "Starting video stream: " +
-            (resolution.width > 0 ? resolution.width : "native") +
-            " x " +
-            (resolution.height > 0 ? resolution.height : "native") +
-            ", " +
-            (fps > 0 ? fps : "native") +
-            " fps, " +
-            (videoBitrate > 0 ? videoBitrate : "???") +
-            " kbps",
-          this.cameraName
+          'Starting video stream: ' +
+            (resolution.width > 0 ? resolution.width : 'native') +
+            ' x ' +
+            (resolution.height > 0 ? resolution.height : 'native') +
+            ', ' +
+            (fps > 0 ? fps : 'native') +
+            ' fps, ' +
+            (videoBitrate > 0 ? videoBitrate : '???') +
+            ' kbps',
+          this.cameraName,
         );
 
         //   let ffmpegArgs = this.videoConfig.source;
@@ -416,91 +412,91 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
 
         ffmpegArgs += // Video
           // (this.videoConfig.mapvideo ? ' -map ' + this.videoConfig.mapvideo : ' -an -sn -dn') +
-          " -an -sn -dn" +
-          " -codec:v " +
+          ' -an -sn -dn' +
+          ' -codec:v ' +
           vcodec +
-          " -pix_fmt yuv420p" +
-          " -color_range mpeg" +
+          ' -pix_fmt yuv420p' +
+          ' -color_range mpeg' +
           // (fps > 0 ? ' -r ' + fps : '') +
-          " -f rawvideo" +
-          (encoderOptions ? " " + encoderOptions : "") +
+          ' -f rawvideo' +
+          (encoderOptions ? ' ' + encoderOptions : '') +
           (resolution.videoFilter.length > 0
-            ? " -filter:v " + resolution.videoFilter
-            : "") +
-          (videoBitrate > 0 ? " -b:v " + videoBitrate + "k" : "") +
-          " -payload_type " +
+            ? ' -filter:v ' + resolution.videoFilter
+            : '') +
+          (videoBitrate > 0 ? ' -b:v ' + videoBitrate + 'k' : '') +
+          ' -payload_type ' +
           request.video.pt;
 
         ffmpegArgs += // Video Stream
-          " -ssrc " +
+          ' -ssrc ' +
           sessionInfo.videoSSRC +
-          " -f rtp" +
-          " -srtp_out_suite AES_CM_128_HMAC_SHA1_80" +
-          " -srtp_out_params " +
-          sessionInfo.videoSRTP.toString("base64") +
-          " srtp://" +
+          ' -f rtp' +
+          ' -srtp_out_suite AES_CM_128_HMAC_SHA1_80' +
+          ' -srtp_out_params ' +
+          sessionInfo.videoSRTP.toString('base64') +
+          ' srtp://' +
           sessionInfo.address +
-          ":" +
+          ':' +
           sessionInfo.videoPort +
-          "?rtcpport=" +
+          '?rtcpport=' +
           sessionInfo.videoPort +
-          "&pkt_size=" +
+          '&pkt_size=' +
           mtu;
 
         if (this.audio) {
           ffmpegArgs += // Audio
             //   (this.videoConfig.mapaudio ? ' -map ' + this.videoConfig.mapaudio : ' -vn -sn -dn') +
-            " -vn -sn -dn";
-          " -codec:a libfdk_aac" +
-            " -profile:a aac_eld" +
-            " -flags +global_header" +
-            " -f null" +
-            " -ar " +
+            ' -vn -sn -dn';
+          ' -codec:a libfdk_aac' +
+            ' -profile:a aac_eld' +
+            ' -flags +global_header' +
+            ' -f null' +
+            ' -ar ' +
             request.audio.sample_rate +
-            "k" +
-            " -b:a " +
+            'k' +
+            ' -b:a ' +
             request.audio.max_bit_rate +
-            "k" +
-            " -ac " +
+            'k' +
+            ' -ac ' +
             request.audio.channel +
-            " -payload_type " +
+            ' -payload_type ' +
             request.audio.pt;
 
           ffmpegArgs += // Audio Stream
-            " -ssrc " +
+            ' -ssrc ' +
             sessionInfo.audioSSRC +
-            " -f rtp" +
-            " -srtp_out_suite AES_CM_128_HMAC_SHA1_80" +
-            " -srtp_out_params " +
-            sessionInfo.audioSRTP.toString("base64") +
-            " srtp://" +
+            ' -f rtp' +
+            ' -srtp_out_suite AES_CM_128_HMAC_SHA1_80' +
+            ' -srtp_out_params ' +
+            sessionInfo.audioSRTP.toString('base64') +
+            ' srtp://' +
             sessionInfo.address +
-            ":" +
+            ':' +
             sessionInfo.audioPort +
-            "?rtcpport=" +
+            '?rtcpport=' +
             sessionInfo.audioPort +
-            "&pkt_size=188";
+            '&pkt_size=188';
         }
 
         if (this.debug) {
-          ffmpegArgs += " -loglevel level+verbose";
+          ffmpegArgs += ' -loglevel level+verbose';
         }
 
         const activeSession: ActiveSession = {};
 
-        activeSession.socket = createSocket(sessionInfo.ipv6 ? "udp6" : "udp4");
-        activeSession.socket.on("error", (err: Error) => {
-          this.log.error("Socket error: " + err.name, this.cameraName);
+        activeSession.socket = createSocket(sessionInfo.ipv6 ? 'udp6' : 'udp4');
+        activeSession.socket.on('error', (err: Error) => {
+          this.log.error('Socket error: ' + err.name, this.cameraName);
           this.stopStream(request.sessionID);
         });
-        activeSession.socket.on("message", () => {
+        activeSession.socket.on('message', () => {
           if (activeSession.timeout) {
             clearTimeout(activeSession.timeout);
           }
           activeSession.timeout = setTimeout(() => {
             this.log.info(
-              "Device appears to be inactive. Stopping stream.",
-              this.cameraName
+              'Device appears to be inactive. Stopping stream.',
+              this.cameraName,
             );
             this.controller.forceStopStreamingSession(request.sessionID);
             this.stopStream(request.sessionID);
@@ -508,7 +504,7 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
         });
         activeSession.socket.bind(
           sessionInfo.videoReturnPort,
-          sessionInfo.localAddress
+          sessionInfo.localAddress,
         );
 
         activeSession.mainProcess = new FfmpegProcess(
@@ -519,7 +515,7 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
           this.log,
           this.debug,
           this,
-          callback
+          callback,
         );
 
         //   if (this.videoConfig.returnAudioTarget) {
@@ -563,7 +559,7 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
 
   handleStreamRequest(
     request: StreamingRequest,
-    callback: StreamRequestCallback
+    callback: StreamRequestCallback,
   ): void {
     switch (request.type) {
       case StreamRequestTypes.START:
@@ -571,17 +567,17 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
         break;
       case StreamRequestTypes.RECONFIGURE:
         this.log.debug(
-          "Received request to reconfigure: " +
+          'Received request to reconfigure: ' +
             request.video.width +
-            " x " +
+            ' x ' +
             request.video.height +
-            ", " +
+            ', ' +
             request.video.fps +
-            " fps, " +
+            ' fps, ' +
             request.video.max_bit_rate +
-            " kbps (Ignored)",
+            ' kbps (Ignored)',
           this.cameraName,
-          this.debug
+          this.debug,
         );
         callback();
         break;
@@ -602,29 +598,29 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
         session.socket?.close();
       } catch (err) {
         this.log.error(
-          "Error occurred closing socket: " + err,
-          this.cameraName
+          'Error occurred closing socket: ' + err,
+          this.cameraName,
         );
       }
       try {
         session.mainProcess?.stop();
       } catch (err) {
         this.log.error(
-          "Error occurred terminating main FFmpeg process: " + err,
-          this.cameraName
+          'Error occurred terminating main FFmpeg process: ' + err,
+          this.cameraName,
         );
       }
       try {
         session.returnProcess?.stop();
       } catch (err) {
         this.log.error(
-          "Error occurred terminating two-way FFmpeg process: " + err,
-          this.cameraName
+          'Error occurred terminating two-way FFmpeg process: ' + err,
+          this.cameraName,
         );
       }
     }
     delete this.ongoingSessions[sessionId];
-    this.log.info("Stopped video stream.", this.cameraName);
+    this.log.info('Stopped video stream.', this.cameraName);
 
     this.platform.httpService
       .stopStream({
@@ -635,6 +631,8 @@ export class EufyCameraStreamingDelegate implements CameraStreamingDelegate {
       .catch(() => {
         // noop
       })
-      .then(() => {});
+      .then(() => {
+        // noop
+      });
   }
 }

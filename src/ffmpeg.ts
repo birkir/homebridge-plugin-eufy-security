@@ -1,7 +1,7 @@
-import { ChildProcess, spawn } from "child_process";
-import { StreamRequestCallback } from "homebridge";
-import { Writable } from "stream";
-import { EufyCameraStreamingDelegate } from "./new-streaming-delegate";
+import { ChildProcess, spawn } from 'child_process';
+import { StreamRequestCallback, Logger } from 'homebridge';
+import { Writable } from 'stream';
+import { EufyCameraStreamingDelegate } from './new-streaming-delegate';
 
 export class FfmpegProcess {
   private readonly process: ChildProcess;
@@ -11,15 +11,15 @@ export class FfmpegProcess {
     sessionId: string,
     videoProcessor: string,
     ffmpegArgs: string,
-    log: any,
+    log: Logger,
     debug: boolean,
     delegate: EufyCameraStreamingDelegate,
-    callback?: StreamRequestCallback
+    callback?: StreamRequestCallback,
   ) {
     log.debug(
-      "Stream command: " + videoProcessor + " " + ffmpegArgs,
+      'Stream command: ' + videoProcessor + ' ' + ffmpegArgs,
       cameraName,
-      debug
+      debug,
     );
 
     let started = false;
@@ -28,14 +28,14 @@ export class FfmpegProcess {
     });
 
     if (this.process.stdin) {
-      this.process.stdin.on("error", (error: Error) => {
-        if (!error.message.includes("EPIPE")) {
+      this.process.stdin.on('error', (error: Error) => {
+        if (!error.message.includes('EPIPE')) {
           log.error(error.message, cameraName);
         }
       });
     }
     if (this.process.stderr) {
-      this.process.stderr.on("data", (data) => {
+      this.process.stderr.on('data', (data) => {
         if (!started) {
           started = true;
           if (callback) {
@@ -48,32 +48,32 @@ export class FfmpegProcess {
             .toString()
             .split(/\n/)
             .forEach((line: string) => {
-              if (line && line !== "") {
+              if (line && line !== '') {
                 log.debug(line);
               }
             });
         }
       });
     }
-    this.process.on("error", (error: Error) => {
-      log.error("Failed to start stream: " + error.message, cameraName);
+    this.process.on('error', (error: Error) => {
+      log.error('Failed to start stream: ' + error.message, cameraName);
       if (callback) {
-        callback(new Error("FFmpeg process creation failed"));
+        callback(new Error('FFmpeg process creation failed'));
       }
       delegate.stopStream(sessionId);
     });
-    this.process.on("exit", (code: number, signal: NodeJS.Signals) => {
+    this.process.on('exit', (code: number, signal: NodeJS.Signals) => {
       const message =
-        "FFmpeg exited with code: " + code + " and signal: " + signal;
+        'FFmpeg exited with code: ' + code + ' and signal: ' + signal;
 
-      if (code == null || code === 255) {
+      if (code === null || code === 255) {
         if (this.process.killed) {
-          log.debug(message + " (Expected)", cameraName, debug);
+          log.debug(message + ' (Expected)', cameraName, debug);
         } else {
-          log.error(message + " (Unexpected)", cameraName);
+          log.error(message + ' (Unexpected)', cameraName);
         }
       } else {
-        log.error(message + " (Error)", cameraName);
+        log.error(message + ' (Error)', cameraName);
         delegate.stopStream(sessionId);
         if (!started && callback) {
           callback(new Error(message));
@@ -85,7 +85,7 @@ export class FfmpegProcess {
   }
 
   public stop(): void {
-    this.process.kill("SIGKILL");
+    this.process.kill('SIGKILL');
   }
 
   public getStdin(): Writable | null {

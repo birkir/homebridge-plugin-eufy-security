@@ -1,6 +1,6 @@
-import { API } from "homebridge";
-import { PLATFORM_NAME } from "./settings";
-import { EufySecurityHomebridgePlatform } from "./platform";
+import { API } from 'homebridge';
+import { PLATFORM_NAME } from './settings';
+import { EufySecurityHomebridgePlatform } from './platform';
 
 /**
  * This method registers the platform with Homebridge

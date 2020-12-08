@@ -2,10 +2,10 @@ import {
   Service,
   PlatformAccessory,
   CharacteristicGetCallback,
-} from "homebridge";
-import { FullDevice } from "eufy-node-client/src/http/http-response.models";
-import { EufySecurityHomebridgePlatform } from "./platform";
-import { EufyCameraStreamingDelegate } from "./new-streaming-delegate";
+} from 'homebridge';
+import { FullDevice } from 'eufy-node-client/src/http/http-response.models';
+import { EufySecurityHomebridgePlatform } from './platform';
+import { EufyCameraStreamingDelegate } from './new-streaming-delegate';
 
 /**
  * Platform Accessory
@@ -18,24 +18,24 @@ export class DoorbellPlatformAccessory {
   constructor(
     private readonly platform: EufySecurityHomebridgePlatform,
     private readonly accessory: PlatformAccessory,
-    private readonly device: FullDevice
+    private readonly device: FullDevice,
   ) {
-    this.platform.log.debug("Constructed Doorbell");
+    this.platform.log.debug('Constructed Doorbell');
 
     // set accessory information
     this.accessory
       .getService(this.platform.Service.AccessoryInformation)!
-      .setCharacteristic(this.platform.Characteristic.Manufacturer, "Eufy")
+      .setCharacteristic(this.platform.Characteristic.Manufacturer, 'Eufy')
       .setCharacteristic(
         this.platform.Characteristic.Model,
-        device.device_model
+        device.device_model,
       )
       .setCharacteristic(
         this.platform.Characteristic.SerialNumber,
-        device.device_sn
+        device.device_sn,
       );
 
-    this.platform.log.debug("Device", device);
+    this.platform.log.debug('Device', device);
 
     this.service =
       this.accessory.getService(this.platform.Service.Doorbell) ||
@@ -43,12 +43,12 @@ export class DoorbellPlatformAccessory {
 
     this.service.setCharacteristic(
       this.platform.Characteristic.Name,
-      "Test device"
+      'Test device',
     );
 
     this.service
       .getCharacteristic(this.platform.Characteristic.ProgrammableSwitchEvent)
-      .on("get", this.handleProgrammableSwitchEventGet.bind(this));
+      .on('get', this.handleProgrammableSwitchEventGet.bind(this));
 
     this.service.setPrimaryService(true);
 
