@@ -127,6 +127,14 @@ export enum VerfyCodeTypes {
     TYPE_EMAIL = 2
 }
 
+// Taken from https://github.com/nonsleepr/python-eufy-security-mqtt/blob/master/src/eufy_security/mqtt/doorbell.proto
+export enum MessageTypes {
+    BACKGROUND_ACTIVE = 3100,
+    MOTION_DETECTION = 3101,
+    FACE_DETECTION = 3102,
+    PRESS_DOORBELL = 3103,
+}
+
 export const DeviceStateID = {
   NAME: 'name',
   MODEL: 'model',
