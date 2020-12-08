@@ -11,7 +11,7 @@ import { HttpService, PushRegisterService, PushClient } from 'eufy-node-client';
 import { CheckinResponse, FidInstallationResponse, GcmRegisterResponse } from 'eufy-node-client/src/push/fid.model';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { DoorbellPlatformAccessory } from './doorbell-platform-accessory';
-import { DeviceType } from './eufy-types';
+import { DeviceType, MessageTypes } from './eufy-types';
 import fs from 'fs';
 
 interface EufyPlatformConfig extends PlatformConfig {
@@ -34,9 +34,6 @@ interface PushCredentials {
  * This class is the main constructor for your plugin, this is where you should
  * parse the user config and discover/register accessories with Homebridge.
  */
-
-
- 
 export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap
@@ -137,7 +134,9 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
       this.log.debug('push message:', msg.payload);
 
       if (knownAccessory) {
-        if (msg.payload?.event_type === 3100) {
+        if (msg.payload?.event_type === MessageTypes.MOTION_DETECTION || msg.payload?.event_type === MessageTypes.FACE_DETECTION) {
+          // TODO: Implement motion sensor
+        } else if (msg.payload?.event_type === MessageTypes.PRESS_DOORBELL) {
           knownAccessory
             .getService(this.api.hap.Service.Doorbell)!
             .updateCharacteristic(
