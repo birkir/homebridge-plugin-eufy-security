@@ -168,91 +168,97 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
     const hubs = await this.httpService.listHubs();
 
     for (const hub of hubs) {
+      this.log.debug(
+        `found hub "${hub.station_name}" (${hub.station_sn}) `,
+      );
+
       if (this.config.ignoreHubSns?.includes(hub.station_sn)) {
-        this.log.debug('ignoring station ' + hub.station_sn);
+        this.log.debug('ignoring hub ' + hub.station_sn);
+      }
+    }
+
+    const devices = await this.httpService.listDevices();
+
+    for (const device of devices) {
+      const ignoredHub = this.config.ignoreHubSns?.includes(device.station_sn);
+      const ignoredDevice = this.config.ignoreDeviceSns?.includes(device.device_sn);
+
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { params, member, station_conn, ...strippedDevice } = device;
+
+      this.log.debug(`found device "${device.device_name}" (${device.device_sn})
+ID: ${device.device_id}
+Model: ${device.device_model}
+Serial Number: ${device.device_sn}
+Type: ${device.device_type}
+Channel: ${device.device_channel}
+Hub: ${device.station_conn.station_name} (${device.station_sn})
+      `);
+      this.log.debug(
+        `device dump: ${{
+          ...strippedDevice,
+          params: params.map((param) => [
+            param.param_id,
+            param.param_type,
+            param.param_value,
+          ]),
+        }}`,
+      );
+
+      if (ignoredHub) {
+        this.log.debug(`device is part of ignored hub "${device.station_sn}"`);
+      }
+
+      if (ignoredDevice) {
+        this.log.debug(`device is ignored "${device.device_sn}"`);
+      }
+
+      if (ignoredHub || ignoredDevice) {
         continue;
       }
 
-      const { station_sn } = hub;
-
-      this.log.debug(
-        `found station "${hub.station_name}" (${hub.station_sn}) `,
+      const uuid = this.api.hap.uuid.generate(device.device_sn);
+      const existingAccessory = this.accessories.find(
+        (accessory) => accessory.UUID === uuid,
       );
 
-      const devices = await this.httpService.listDevices({ station_sn });
-
-      for (const device of devices) {
-        if (this.config.ignoreDeviceSns?.includes(device.device_sn)) {
-          this.log.debug(
-            `ignoring device "${device.device_name}" (${device.device_sn})`,
+      // doorbell
+      if (
+        [
+          DeviceType.BATTERY_DOORBELL,
+          DeviceType.BATTERY_DOORBELL_2,
+          DeviceType.DOORBELL,
+        ].includes(device.device_type)
+      ) {
+        if (existingAccessory) {
+          // the accessory already exists
+          this.log.info(
+            'Restoring existing accessory from cache:',
+            existingAccessory.displayName,
           );
-          continue;
-        }
+          new DoorbellPlatformAccessory(this, existingAccessory, device);
+        } else {
+          // the accessory does not yet exist, so we need to create it
+          this.log.info('Adding new accessory:', device.device_name);
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { params, member, station_conn, ...strippedDevice } = device;
+          // create a new accessory
+          const accessory = new this.api.platformAccessory(
+            device.device_name,
+            uuid,
+          );
 
-        this.log.debug(`found device "${device.device_name}" (${hub.station_sn})
-  ID: ${device.device_id}
-  Model: ${device.device_model}
-  Serial Number: ${device.device_sn}
-  Type: ${device.device_type}
-  Channel: ${device.device_channel}
-        `);
-        this.log.debug(
-          `device dump: ${{
-            ...strippedDevice,
-            params: params.map((param) => [
-              param.param_id,
-              param.param_type,
-              param.param_value,
-            ]),
-          }}`,
-        );
+          // store a copy of the device object in the `accessory.context`
+          // the `context` property can be used to store any data about the accessory you may need
+          accessory.context.device = device;
 
-        const uuid = this.api.hap.uuid.generate(device.device_sn);
-        const existingAccessory = this.accessories.find(
-          (accessory) => accessory.UUID === uuid,
-        );
+          // create the accessory handler for the newly create accessory
+          // this is imported from `platformAccessory.ts`
+          new DoorbellPlatformAccessory(this, accessory, device);
 
-        // doorbell
-        if (
-          [
-            DeviceType.BATTERY_DOORBELL,
-            DeviceType.BATTERY_DOORBELL_2,
-            DeviceType.DOORBELL,
-          ].includes(device.device_type)
-        ) {
-          if (existingAccessory) {
-            // the accessory already exists
-            this.log.info(
-              'Restoring existing accessory from cache:',
-              existingAccessory.displayName,
-            );
-            new DoorbellPlatformAccessory(this, existingAccessory, device);
-          } else {
-            // the accessory does not yet exist, so we need to create it
-            this.log.info('Adding new accessory:', device.device_name);
-
-            // create a new accessory
-            const accessory = new this.api.platformAccessory(
-              device.device_name,
-              uuid,
-            );
-
-            // store a copy of the device object in the `accessory.context`
-            // the `context` property can be used to store any data about the accessory you may need
-            accessory.context.device = device;
-
-            // create the accessory handler for the newly create accessory
-            // this is imported from `platformAccessory.ts`
-            new DoorbellPlatformAccessory(this, accessory, device);
-
-            // link the accessory to your platform
-            this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
-              accessory,
-            ]);
-          }
+          // link the accessory to your platform
+          this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [
+            accessory,
+          ]);
         }
       }
     }
