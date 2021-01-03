@@ -20,6 +20,22 @@
         "type": "boolean",
         "default": true,
         "required": true
+      },
+      "ignoreHubSns": {
+        "title":"Ignore Hubs",
+        "type": "array",
+        "items": {
+          "title": "Hub serial number",
+          "type": "string"
+        }
+      },
+      "ignoreDeviceSns": {
+        "title":"Ignore Devices",
+        "type": "array",
+        "items": {
+          "title": "Device serial number",
+          "type": "string"
+        }
       }
     }
   }
