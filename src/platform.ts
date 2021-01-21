@@ -101,20 +101,24 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
 
     const fcmToken = credentials.gcmResponse.token;
     await new Promise((resolve) => {
+      const tHandle = setTimeout(() => {
+        this.log.error('registering a push token timed out');
+        resolve(true);
+      }, 20000);
+
       this.httpService
         .registerPushToken(fcmToken)
         .catch((err) => {
+          clearTimeout(tHandle);
           this.log.error('failed to register push token', err);
           resolve(true);
         })
         .then(() => {
+          clearTimeout(tHandle);
           this.log.debug('registered at eufy with:', fcmToken);
           resolve(true);
         });
-      setTimeout(() => {
-        this.log.error('registering a push token timed out');
-        resolve(true);
-      }, 20000);
+      
     });
 
     setInterval(async () => {
