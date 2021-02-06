@@ -101,20 +101,24 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
 
     const fcmToken = credentials.gcmResponse.token;
     await new Promise((resolve) => {
+      const tHandle = setTimeout(() => {
+        this.log.error('registering a push token timed out');
+        resolve(true);
+      }, 20000);
+
       this.httpService
         .registerPushToken(fcmToken)
         .catch((err) => {
+          clearTimeout(tHandle);
           this.log.error('failed to register push token', err);
           resolve(true);
         })
         .then(() => {
+          clearTimeout(tHandle);
           this.log.debug('registered at eufy with:', fcmToken);
           resolve(true);
         });
-      setTimeout(() => {
-        this.log.error('registering a push token timed out');
-        resolve(true);
-      }, 20000);
+      
     });
 
     setInterval(async () => {
@@ -126,17 +130,17 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
     }, 30 * 1000);
 
     pushClient.connect((msg) => {
+      this.log.debug('push message:', msg);
       const matchingUuid = this.api.hap.uuid.generate(msg.payload?.device_sn);
       const knownAccessory = this.accessories.find(
         (accessory) => accessory.UUID === matchingUuid,
       );
-
-      this.log.debug('push message:', msg.payload);
+      const event_type = msg.payload?.payload?.event_type;
 
       if (knownAccessory) {
-        if (msg.payload?.event_type === MessageTypes.MOTION_DETECTION || msg.payload?.event_type === MessageTypes.FACE_DETECTION) {
+        if (event_type === MessageTypes.MOTION_DETECTION || event_type === MessageTypes.FACE_DETECTION) {
           // TODO: Implement motion sensor
-        } else if (msg.payload?.event_type === MessageTypes.PRESS_DOORBELL) {
+        } else if (event_type === MessageTypes.PRESS_DOORBELL) {
           knownAccessory
             .getService(this.api.hap.Service.Doorbell)!
             .updateCharacteristic(
