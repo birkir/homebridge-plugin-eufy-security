@@ -71,7 +71,13 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
 
       log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
-      this.discoverDevices();
+
+      try {
+        this.discoverDevices();
+      } catch(error) {
+        this.log.error('error while discovering devices');
+        this.log.error(error);
+      }
     });
   }
 
