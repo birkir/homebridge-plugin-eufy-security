@@ -21,6 +21,7 @@ interface EufyPlatformConfig extends PlatformConfig {
 
   ignoreHubSns: string[];
   ignoreDeviceSns: string[];
+  platform: string;
 }
 
 interface PushCredentials {
@@ -53,7 +54,7 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
   ) {
     this.config = config as EufyPlatformConfig;
     // this.log.debug('Config', this.config);
-    this.log.debug('Finished initializing platform:', this.config.name);
+    this.log.debug('Finished initializing platform:', this.config.platform);
 
     this.httpService = new HttpService(this.config.username, this.config.password);
 
@@ -71,7 +72,13 @@ export class EufySecurityHomebridgePlatform implements DynamicPlatformPlugin {
 
       log.debug('Executed didFinishLaunching callback');
       // run the method to discover / register your devices as accessories
-      this.discoverDevices();
+
+      try {
+        this.discoverDevices();
+      } catch(error) {
+        this.log.error('error while discovering devices');
+        this.log.error(error);
+      }
     });
   }
 
