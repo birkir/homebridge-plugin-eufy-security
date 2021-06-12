@@ -831,10 +831,10 @@ esutils@^2.0.2:
   resolved "https://registry.yarnpkg.com/esutils/-/esutils-2.0.3.tgz#74d2eb4de0b8da1293711910d50775b9b710ef64"
   integrity sha512-kVscqXk4OCp68SZ0dkgEKVi6/8ij300KBWTJq32P/dYeWTSwK41WyTxalN1eRmA5Z9UU/LX9D7FWSmV9SAYx6g==
 
-eufy-node-client@^0.3.1:
-  version "0.3.1"
-  resolved "https://registry.yarnpkg.com/eufy-node-client/-/eufy-node-client-0.3.1.tgz#672c4dfe072c9ae04c88390f7207f4acdf5fd957"
-  integrity sha512-FiSuOOMtTT41ys1zLPNR4/xVGKZ0n9tcn5CiTRC15bWdUFGLF+ls+jP59hz3XhEo2mNPRoWf6GjjQrmbh/qNmg==
+eufy-node-client@^0.5.0:
+  version "0.5.0"
+  resolved "https://registry.yarnpkg.com/eufy-node-client/-/eufy-node-client-0.5.0.tgz#4575c3c40db702d8523863910319a042e44679b0"
+  integrity sha512-u8itDp2Y7SQvmdkQLds+WMmSnDkSoURjD3goy76Ge5ZTW/Ampysw5h+oF1XJKmhGTADxQsUTFWJF5/yDVUFoCw==
   dependencies:
     dgram "^1.0.1"
     dotenv "^8.2.0"
@@ -1494,9 +1494,9 @@ normalize-path@^3.0.0, normalize-path@~3.0.0:
   integrity sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==
 
 normalize-url@^4.1.0:
-  version "4.5.0"
-  resolved "https://registry.yarnpkg.com/normalize-url/-/normalize-url-4.5.0.tgz#453354087e6ca96957bd8f5baf753f5982142129"
-  integrity sha512-2s47yzUxdexf1OhyRi4Em83iQk0aPvwTddtFz4hnSSw9dCEsLEGf6SwIO8ss/19S9iBb5sJaOuTvTGDeZI00BQ==
+  version "4.5.1"
+  resolved "https://registry.yarnpkg.com/normalize-url/-/normalize-url-4.5.1.tgz#0dd90cf1288ee1d1313b87081c9a5932ee48518a"
+  integrity sha512-9UZCFRHQdNrfTpGg8+1INIg93B6zE0aXMVFkw1WFwvO4SlZywU6aLg5Of0Ap/PgcbSw4LNxvMWXMeugwMCX0AA==
 
 npm-run-path@^4.0.0:
   version "4.0.1"
